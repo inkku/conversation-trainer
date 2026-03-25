@@ -305,6 +305,21 @@ async def get_history():
     return {"sessions": []}
 
 
+class ScreenshotRequest(BaseModel):
+    filename: str
+    data: str  # base64 PNG data URL
+
+@app.post("/save-screenshot")
+async def save_screenshot(req: ScreenshotRequest):
+    import base64, os
+    data = req.data.split(",", 1)[1] if "," in req.data else req.data
+    path = os.path.join(os.path.dirname(__file__), "screenshots", req.filename)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "wb") as f:
+        f.write(base64.b64decode(data))
+    return {"saved": path}
+
+
 # ── Dev server ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
