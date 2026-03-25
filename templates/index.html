@@ -14,7 +14,7 @@
     <h2 style="margin:0 0 6px;font-size:1.3rem;color:var(--text);">Choose your AI</h2>
     <p style="margin:0 0 24px;color:var(--muted);font-size:0.9rem;">Pick the provider you have a subscription with. Your key is stored only in this browser.</p>
 
-    <div id="provider-tiles" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px;">
+    <div id="provider-tiles" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:20px;">
       <div class="provider-tile" data-provider="anthropic" data-model="claude-opus-4-6" data-placeholder="sk-ant-…" data-link="https://console.anthropic.com/settings/keys" onclick="selectProvider(this)" style="background:var(--surface-alt);border:2px solid var(--border);border-radius:10px;padding:14px 12px;cursor:pointer;transition:border-color 0.15s;">
         <div style="font-size:1.3rem;margin-bottom:6px;">🧠</div>
         <div style="font-weight:600;font-size:0.9rem;color:var(--text);">Claude</div>
@@ -28,12 +28,7 @@
       <div class="provider-tile" data-provider="google" data-model="gemini/gemini-1.5-pro" data-placeholder="AIza…" data-link="https://aistudio.google.com/app/apikey" onclick="selectProvider(this)" style="background:var(--surface-alt);border:2px solid var(--border);border-radius:10px;padding:14px 12px;cursor:pointer;transition:border-color 0.15s;">
         <div style="font-size:1.3rem;margin-bottom:6px;">💎</div>
         <div style="font-weight:600;font-size:0.9rem;color:var(--text);">Gemini</div>
-        <div style="font-size:0.75rem;color:var(--muted);">Google</div>
-      </div>
-      <div class="provider-tile" data-provider="ollama" data-model="ollama/llama3.1" data-placeholder="" data-link="https://ollama.com" onclick="selectProvider(this)" style="background:var(--surface-alt);border:2px solid var(--border);border-radius:10px;padding:14px 12px;cursor:pointer;transition:border-color 0.15s;">
-        <div style="font-size:1.3rem;margin-bottom:6px;">🦙</div>
-        <div style="font-weight:600;font-size:0.9rem;color:var(--text);">Local</div>
-        <div style="font-size:0.75rem;color:var(--muted);">Ollama · free</div>
+        <div style="font-size:0.75rem;color:var(--muted);">Google · free tier</div>
       </div>
     </div>
 
@@ -41,10 +36,6 @@
       <label style="display:block;font-size:0.75rem;font-weight:600;color:var(--muted);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:8px;">API Key</label>
       <input id="provider-key-input" type="password" autocomplete="off" style="width:100%;box-sizing:border-box;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-size:0.9rem;" />
       <a id="provider-key-link" href="#" target="_blank" style="display:inline-block;margin-top:6px;font-size:0.8rem;color:var(--primary);">Where do I get this? →</a>
-    </div>
-
-    <div id="provider-ollama-note" style="display:none;margin-bottom:20px;padding:12px;background:var(--surface-alt);border-radius:8px;font-size:0.85rem;color:var(--muted);">
-      Ollama runs models locally — no API key needed. Make sure <a href="https://ollama.com" target="_blank" style="color:var(--primary);">Ollama</a> is running on your machine first.
     </div>
 
     <button id="provider-save-btn" onclick="saveProvider()" disabled style="width:100%;background:var(--primary);color:#fff;border:none;border-radius:8px;padding:12px;font-size:0.95rem;font-weight:600;cursor:pointer;opacity:0.4;transition:opacity 0.15s;">Save & continue</button>
@@ -312,17 +303,11 @@ function selectProvider(tile, silent) {
 
   const provider = tile.dataset.provider;
   const keyArea = document.getElementById('provider-key-area');
-  const ollamaNote = document.getElementById('provider-ollama-note');
   const keyInput = document.getElementById('provider-key-input');
   const keyLink = document.getElementById('provider-key-link');
   const saveBtn = document.getElementById('provider-save-btn');
 
-  if (provider === 'ollama') {
-    keyArea.style.display = 'none';
-    ollamaNote.style.display = 'block';
-    saveBtn.disabled = false;
-    saveBtn.style.opacity = '1';
-  } else {
+  {
     keyArea.style.display = 'block';
     ollamaNote.style.display = 'none';
     keyInput.placeholder = tile.dataset.placeholder;
@@ -347,7 +332,7 @@ function saveProvider() {
   const provider = _selectedProviderTile.dataset.provider;
   const model    = _selectedProviderTile.dataset.model;
   const keyInput = document.getElementById('provider-key-input');
-  const key      = provider === 'ollama' ? '' : keyInput.value.trim();
+  const key      = keyInput.value.trim();
 
   localStorage.setItem('llm_provider', provider);
   localStorage.setItem('llm_model',    model);
