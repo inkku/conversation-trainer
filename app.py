@@ -17,11 +17,13 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 import numpy as np
 import subprocess
-import anthropic
+import litellm
 import whisper
 import imageio_ffmpeg
 import httpx
 from bs4 import BeautifulSoup
+
+litellm.drop_params = True  # ignore unsupported params per provider
 
 _FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()   # full path — no PATH dependency
 
@@ -36,10 +38,15 @@ print("Whisper ready.")
 app = FastAPI(title="Conversation Trainer")
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
-client = anthropic.Anthropic(
-    timeout=120.0,   # 2-minute ceiling — summary/scenario calls can be slow
-    max_retries=2,   # retry on transient 5xx / network errors
-)
+
+_DEFAULT_MODEL = os.getenv("LLM_MODEL", "claude-opus-4-6")
+
+
+def _llm_params(request: Request) -> dict:
+    """Extract LLM model + api_key from request headers, falling back to env vars."""
+    model = request.headers.get("X-LLM-Model") or _DEFAULT_MODEL
+    api_key = request.headers.get("X-API-Key") or os.getenv("ANTHROPIC_API_KEY") or None
+    return {"model": model, "api_key": api_key}
 
 MAX_HISTORY_TURNS = 20  # pairs of user/assistant
 
@@ -473,6 +480,23 @@ correct. Analyse what was actually said and give feedback on it, even if it read
 # ─────────────────────────────────────────────
 # Tool schema for structured output
 # ─────────────────────────────────────────────
+
+def _tool(name: str, description: str, schema: dict) -> dict:
+    """Wrap a JSON schema as an OpenAI-format tool definition (LiteLLM standard)."""
+    return {"type": "function", "function": {"name": name, "description": description, "parameters": schema}}
+
+
+def _tool_choice(name: str) -> dict:
+    """Force LiteLLM to call a specific tool."""
+    return {"type": "function", "function": {"name": name}}
+
+
+def _parse_tool_result(response) -> dict:
+    """Extract the function arguments dict from a LiteLLM completion response."""
+    tool_calls = response.choices[0].message.tool_calls
+    if not tool_calls:
+        raise ValueError("No tool call in response")
+    return json.loads(tool_calls[0].function.arguments)
 RESPONSE_TOOL_SCHEMA = {
     "type": "object",
     "properties": {
@@ -563,7 +587,7 @@ async def create_session(config: SessionConfig):
 
 
 @app.post("/session/message")
-async def send_message(req: MessageRequest):
+async def send_message(req: MessageRequest, request: Request):
     session = _load_session(req.session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found. Please start a new session.")
@@ -590,29 +614,23 @@ async def send_message(req: MessageRequest):
     if len(history) > MAX_HISTORY_TURNS * 2:
         history = history[:2] + history[-(MAX_HISTORY_TURNS * 2 - 2):]
 
+    llm = _llm_params(request)
     try:
-        response = client.messages.create(
-            model="claude-opus-4-6",
+        response = litellm.completion(
+            model=llm["model"],
+            api_key=llm["api_key"],
             max_tokens=1024,
-            system=build_system_prompt(session),
-            messages=history,
-            tools=[{
-                "name": "tutor_response",
-                "description": "Structured language tutoring response with reply and feedback",
-                "input_schema": RESPONSE_TOOL_SCHEMA
-            }],
-            tool_choice={"type": "tool", "name": "tutor_response"}
+            timeout=120.0,
+            num_retries=2,
+            messages=[{"role": "system", "content": build_system_prompt(session)}, *history],
+            tools=[_tool("tutor_response", "Structured language tutoring response with reply and feedback", RESPONSE_TOOL_SCHEMA)],
+            tool_choice=_tool_choice("tutor_response"),
         )
-    except anthropic.APIError as e:
-        raise HTTPException(status_code=502, detail=f"Claude API error: {str(e)}")
-
-    # Extract structured response from tool_use block
-    tool_block = next((b for b in response.content if b.type == "tool_use"), None)
-    if not tool_block:
-        raise HTTPException(status_code=502, detail="Unexpected response format from Claude.")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LLM API error: {str(e)}")
 
     try:
-        parsed = ConversationResponse.model_validate(tool_block.input)
+        parsed = ConversationResponse.model_validate(_parse_tool_result(response))
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Response parsing error: {str(e)}")
 
@@ -723,7 +741,7 @@ async def fetch_url_text(url: str, max_chars: int = 4000) -> str:
 # ── Scenario endpoint ─────────────────────────────────────────────────────────
 
 @app.post("/session/{session_id}/scenario")
-async def generate_scenario(session_id: str):
+async def generate_scenario(session_id: str, request: Request):
     session = _load_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
@@ -798,23 +816,27 @@ Use the exec_self_brief tool."""
     else:
         raise HTTPException(status_code=400, detail=f"Unknown scenario type: {stype}")
 
+    llm = _llm_params(request)
     try:
-        response = client.messages.create(
-            model="claude-opus-4-6",
+        response = litellm.completion(
+            model=llm["model"],
+            api_key=llm["api_key"],
             max_tokens=900,
+            timeout=120.0,
+            num_retries=2,
             messages=[{"role": "user", "content": prompt}],
-            tools=[{"name": tool_name, "description": "Structured scenario brief",
-                    "input_schema": schema}],
-            tool_choice={"type": "tool", "name": tool_name}
+            tools=[_tool(tool_name, "Structured scenario brief", schema)],
+            tool_choice=_tool_choice(tool_name),
         )
-    except anthropic.APIError as e:
-        raise HTTPException(status_code=502, detail=f"Claude API error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LLM API error: {str(e)}")
 
-    tool_block = next((b for b in response.content if b.type == "tool_use"), None)
-    if not tool_block:
-        raise HTTPException(status_code=502, detail="No scenario returned.")
+    try:
+        scenario_data = _parse_tool_result(response)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"No scenario returned: {str(e)}")
 
-    scenario = {"type": stype, **tool_block.input}
+    scenario = {"type": stype, **scenario_data}
     session["scenario"] = scenario
     _save_session(session_id, session)
     return scenario
@@ -886,7 +908,7 @@ SUMMARY_TOOL_SCHEMA = {
 
 
 @app.post("/session/{session_id}/summary")
-async def get_session_summary(session_id: str):
+async def get_session_summary(session_id: str, request: Request):
     session = _load_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found.")
@@ -919,26 +941,25 @@ Produce a comprehensive session summary using the summary_report tool.
 - Closing message: personal and specific, not generic encouragement.
 """
 
+    llm = _llm_params(request)
     try:
-        response = client.messages.create(
-            model="claude-opus-4-6",
+        response = litellm.completion(
+            model=llm["model"],
+            api_key=llm["api_key"],
             max_tokens=1500,
+            timeout=120.0,
+            num_retries=2,
             messages=[{"role": "user", "content": summary_prompt}],
-            tools=[{
-                "name": "summary_report",
-                "description": "Structured end-of-session learning summary",
-                "input_schema": SUMMARY_TOOL_SCHEMA
-            }],
-            tool_choice={"type": "tool", "name": "summary_report"}
+            tools=[_tool("summary_report", "Structured end-of-session learning summary", SUMMARY_TOOL_SCHEMA)],
+            tool_choice=_tool_choice("summary_report"),
         )
-    except anthropic.APIError as e:
-        raise HTTPException(status_code=502, detail=f"Claude API error: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"LLM API error: {str(e)}")
 
-    tool_block = next((b for b in response.content if b.type == "tool_use"), None)
-    if not tool_block:
-        raise HTTPException(status_code=502, detail="No summary returned.")
-
-    summary = tool_block.input
+    try:
+        summary = _parse_tool_result(response)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"No summary returned: {str(e)}")
     # Persist to history so learners can review past sessions
     session["id"] = session_id
     _save_history_entry(session, summary)
