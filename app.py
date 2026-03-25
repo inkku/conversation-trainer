@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 import numpy as np
@@ -33,6 +34,7 @@ print("Whisper ready.")
 # App setup
 # ─────────────────────────────────────────────
 app = FastAPI(title="Conversation Trainer")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 client = anthropic.Anthropic(
     timeout=120.0,   # 2-minute ceiling — summary/scenario calls can be slow

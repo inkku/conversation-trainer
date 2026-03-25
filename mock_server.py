@@ -16,9 +16,11 @@ from datetime import datetime
 from typing import Optional
 from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="Conversation Trainer — Mock")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 # ── In-memory session store ───────────────────────────────────────────────────

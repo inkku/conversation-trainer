@@ -6,7 +6,14 @@ This guide gets you from zero to a live, interactive version of the app running 
 
 ## What you're working with
 
-The entire UI lives in one file: `templates/index.html`. It's vanilla HTML, CSS, and JavaScript — no build tools, no frameworks. You edit the file, refresh the browser, and see the change immediately.
+There are two files you'll work with:
+
+| File | What it is |
+|---|---|
+| `static/style.css` | **All the visual styling.** This is yours — colours, spacing, typography, layout, animations. |
+| `templates/index.html` | HTML structure and JavaScript logic. Touch the HTML structure freely; leave the `<script>` block at the bottom alone. |
+
+No build tools, no frameworks. Edit a file, refresh the browser, see the change.
 
 The mock server (`mock_server.py`) handles all the backend responses with realistic fake data so you can experience the full app flow without needing anything from the backend team.
 
@@ -63,9 +70,11 @@ You should see:
 
 Open http://localhost:8001 in your browser. The full app is running with realistic fake data.
 
-### Edit the UI
+### Edit the styles
 
-Open `templates/index.html` in your editor of choice. Save the file, then refresh the browser — changes appear immediately. The mock server watches for file changes and reloads automatically.
+Open `static/style.css` in your editor. Save, refresh the browser — done. This file contains every colour, spacing value, font size, and animation in the app. The design tokens at the top of the file (the `:root { }` block) are the fastest place to make sweeping changes.
+
+You can also edit the HTML structure in `templates/index.html`. The mock server watches for file changes and reloads automatically.
 
 ### Stop the server
 
@@ -94,15 +103,23 @@ git pull
 
 The recommended flow:
 1. Design the component or layout in Figma
-2. Find the corresponding section in `index.html` (use `⌘F` to search)
-3. Update the HTML and CSS directly — the design language is all inline styles and CSS variables defined near the top of the file
+2. Update `static/style.css` — all colours, spacing, and typography live there
+3. For structural changes, find the relevant section in `templates/index.html` (use `⌘F` to search)
 
-Key CSS variables (find them by searching `--bg` in the file):
-- `--bg` — page background
-- `--surface-alt` — card/panel backgrounds
-- `--text`, `--muted` — text colours
-- `--accent` — primary highlight colour (purple)
-- `--border` — border colour
+The design tokens at the top of `style.css` are the fastest lever — changing one variable updates everything that uses it:
+
+```css
+:root {
+  --bg: #0d0d0f;          /* page background */
+  --surface: #18181b;     /* header, panels */
+  --surface-alt: #27272a; /* cards, inputs */
+  --primary: #6366f1;     /* brand colour — buttons, links, highlights */
+  --text: #e4e4e7;        /* body text */
+  --muted: #71717a;       /* secondary text, labels */
+  --border: #3f3f46;      /* all borders */
+  --radius: 12px;         /* corner rounding */
+}
+```
 
 ---
 
@@ -125,13 +142,12 @@ Suggested workflow:
 
 | ✅ Go ahead | ⚠️ Check with the dev first |
 |---|---|
-| All visual styling (colours, spacing, typography, layout) | Changing element IDs (`id="mic-btn"`, `id="thread"`, etc.) |
-| Adding new UI sections or panels | Removing or renaming form fields in the setup screen |
-| Updating icons and copy | Changing `onclick` handlers or JavaScript logic |
-| Setup screen layout and topic tile design | The `<script>` block at the bottom |
-| Feedback panel layout | API endpoint calls inside `callAPI()` |
+| Everything in `static/style.css` | Changing element IDs (`id="mic-btn"`, `id="thread"`, etc.) |
+| HTML structure and layout in `index.html` | Removing or renaming form fields in the setup screen |
+| Icons, copy, and labels | Changing `onclick` handlers or JavaScript logic |
+| Adding new HTML elements | The `<script>` block at the bottom of `index.html` |
 
-The safest rule: **change styles and structure freely, leave the JavaScript alone**.
+The safest rule: **`style.css` is entirely yours. In `index.html`, change structure freely — leave the JavaScript alone**.
 
 ---
 
