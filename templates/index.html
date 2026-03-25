@@ -1,0 +1,2004 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Conversation Trainer</title>
+<style>
+  :root {
+    --bg: #0d0d0f;
+    --surface: #18181b;
+    --surface-alt: #27272a;
+    --border: #3f3f46;
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --primary-glow: rgba(99,102,241,0.25);
+    --accent: #6366f1;
+    --user-bubble: #4f46e5;
+    --claude-bubble: #27272a;
+    --text: #e4e4e7;
+    --muted: #71717a;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --orange: #f97316;
+    --purple: #a855f7;
+    --teal: #14b8a6;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --transition: 0.2s ease;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── Header ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 16px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+    letter-spacing: -0.3px;
+    white-space: nowrap;
+  }
+
+  .header-controls {
+    display: flex;
+    gap: 8px;
+    margin-left: auto;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  select {
+    background: var(--surface-alt);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2371717a' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    padding-right: 28px;
+  }
+  select:focus { border-color: var(--primary); }
+
+  .level-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .badge-beginner     { background: rgba(34,197,94,0.15);  color: #22c55e; }
+  .badge-intermediate { background: rgba(99,102,241,0.15); color: #818cf8; }
+  .badge-advanced     { background: rgba(245,158,11,0.15); color: #f59e0b; }
+  .badge-fluent       { background: rgba(168,85,247,0.15); color: #a855f7; }
+
+  /* ── Main layout ── */
+  main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+  }
+
+  /* ── Conversation thread ── */
+  #thread {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scroll-behavior: smooth;
+  }
+
+  #thread::-webkit-scrollbar { width: 4px; }
+  #thread::-webkit-scrollbar-track { background: transparent; }
+  #thread::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .welcome {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--muted);
+  }
+  .welcome h2 { font-size: 22px; color: var(--text); margin-bottom: 8px; }
+  .welcome p  { font-size: 14px; line-height: 1.6; max-width: 400px; margin: 0 auto; }
+  .welcome .hint {
+    margin-top: 20px;
+    font-size: 13px;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* ── Message bubbles ── */
+  .msg {
+    display: flex;
+    gap: 10px;
+    max-width: 82%;
+    animation: fadeUp 0.25s ease;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg.user  { align-self: flex-end; flex-direction: row-reverse; }
+  .msg.claude { align-self: flex-start; }
+
+  .avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .msg.claude .avatar { background: var(--primary); }
+  .msg.user   .avatar { background: var(--surface-alt); }
+
+  .bubble {
+    border-radius: var(--radius);
+    padding: 10px 14px;
+    font-size: 14px;
+    line-height: 1.55;
+    position: relative;
+  }
+
+  .msg.user .bubble {
+    background: var(--user-bubble);
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+
+  .msg.claude .bubble {
+    background: var(--claude-bubble);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+
+  .reply-text { font-size: 14px; line-height: 1.6; }
+  .transliteration {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+    font-style: italic;
+  }
+
+  .bubble-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+    align-items: center;
+  }
+
+  .tts-btn, .action-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all var(--transition);
+  }
+  .tts-btn:hover, .action-btn:hover {
+    background: var(--surface-alt);
+    color: var(--text);
+  }
+
+  /* ── Feedback panel ── */
+  #feedback-panel {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow: hidden;
+    transition: max-height 0.35s ease;
+    max-height: 0;
+  }
+  #feedback-panel.open { max-height: 320px; }
+
+  .feedback-inner {
+    padding: 12px 16px 16px;
+    overflow-y: auto;
+    max-height: 304px;
+  }
+  .feedback-inner::-webkit-scrollbar { width: 3px; }
+  .feedback-inner::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .feedback-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .feedback-header h3 {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--muted);
+  }
+
+  .confidence-bar {
+    display: flex;
+    gap: 3px;
+    margin-left: auto;
+    align-items: center;
+  }
+  .conf-label { font-size: 11px; color: var(--muted); margin-right: 4px; }
+  .conf-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background var(--transition);
+  }
+  .conf-dot.filled { background: var(--primary); }
+  .conf-dot.filled.high { background: var(--success); }
+  .conf-dot.filled.low  { background: var(--danger); }
+
+  .overall-text {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    background: var(--surface-alt);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--primary);
+  }
+
+  .feedback-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .feedback-item {
+    background: var(--surface-alt);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    font-size: 13px;
+    border: 1px solid transparent;
+  }
+
+  .fi-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .fi-tag {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+  }
+  .tag-grammar     { background: rgba(99,102,241,0.2); color: #818cf8; }
+  .tag-vocabulary  { background: rgba(20,184,166,0.2); color: #2dd4bf; }
+  .tag-structure   { background: rgba(34,197,94,0.2);  color: #4ade80; }
+  .tag-filler      { background: rgba(249,115,22,0.2); color: #fb923c; }
+  .tag-phrasing    { background: rgba(245,158,11,0.2); color: #fbbf24; }
+  .tag-confidence  { background: rgba(168,85,247,0.2); color: #c084fc; }
+  .tag-presence    { background: rgba(168,85,247,0.2); color: #c084fc; }
+  .tag-default     { background: rgba(113,113,122,0.2); color: var(--muted); }
+
+  .fi-issue { flex: 1; color: var(--text); }
+  .fi-chevron { color: var(--muted); font-size: 10px; transition: transform var(--transition); }
+  .fi-chevron.open { transform: rotate(180deg); }
+
+  .fi-details {
+    overflow: hidden;
+    max-height: 0;
+    transition: max-height 0.25s ease;
+  }
+  .fi-details.open { max-height: 120px; }
+  .fi-details-inner {
+    padding-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    border-top: 1px solid var(--border);
+    margin-top: 6px;
+  }
+  .fi-correction {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    align-items: baseline;
+  }
+  .fi-original   { text-decoration: line-through; color: var(--danger); opacity: 0.7; }
+  .fi-arrow      { color: var(--muted); }
+  .fi-fixed      { color: var(--success); font-weight: 500; }
+
+  /* ── Filler words section ── */
+  .filler-section {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: rgba(249,115,22,0.08);
+    border: 1px solid rgba(249,115,22,0.2);
+    border-radius: var(--radius-sm);
+  }
+  .filler-section h4 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--orange);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .filler-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .filler-chip {
+    font-size: 12px;
+    padding: 3px 10px;
+    background: rgba(249,115,22,0.15);
+    border: 1px solid rgba(249,115,22,0.3);
+    border-radius: 20px;
+    color: var(--orange);
+  }
+  .filler-chip .count {
+    font-weight: 700;
+    margin-left: 4px;
+    background: rgba(249,115,22,0.3);
+    border-radius: 10px;
+    padding: 0 5px;
+    font-size: 11px;
+  }
+
+  /* ── Suggested phrases ── */
+  #phrases-bar {
+    padding: 8px 16px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+    display: none;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+  }
+  #phrases-bar.visible { display: flex; }
+  .phrases-label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .phrase-chip {
+    font-size: 12px;
+    padding: 5px 12px;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    color: var(--text);
+    cursor: pointer;
+    transition: all var(--transition);
+    white-space: nowrap;
+  }
+  .phrase-chip:hover {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-glow);
+  }
+
+  /* ── Input area ── */
+  #input-area {
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .input-row {
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+
+  #text-input {
+    flex: 1;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-size: 14px;
+    padding: 10px 14px;
+    resize: none;
+    outline: none;
+    line-height: 1.4;
+    font-family: inherit;
+    min-height: 42px;
+    max-height: 120px;
+    transition: border-color var(--transition);
+  }
+  #text-input:focus { border-color: var(--primary); }
+  #text-input::placeholder { color: var(--muted); }
+
+  #send-btn {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: var(--primary);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--transition);
+    color: white;
+  }
+  #send-btn:hover:not(:disabled) { background: var(--primary-dark); }
+  #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Mic button ── */
+  .mic-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  #mic-btn {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    background: var(--surface-alt);
+    color: var(--muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+    position: relative;
+    flex-shrink: 0;
+  }
+  #mic-btn:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-glow);
+  }
+  #mic-btn.listening {
+    border-color: var(--danger);
+    color: white;
+    background: var(--danger);
+    animation: pulse 1.5s infinite;
+  }
+  #mic-btn.processing {
+    border-color: var(--primary);
+    color: var(--primary);
+    background: var(--primary-glow);
+    cursor: not-allowed;
+  }
+  #mic-btn.speaking {
+    border-color: var(--success);
+    color: var(--success);
+    background: rgba(34,197,94,0.1);
+    cursor: not-allowed;
+  }
+  #mic-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.4); }
+    50%       { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+  }
+
+  .mic-status {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    min-width: 90px;
+  }
+  .mic-status.listening  { color: var(--danger); }
+  .mic-status.processing { color: var(--primary); }
+  .mic-status.speaking   { color: var(--success); }
+
+  /* ── Interim transcript ── */
+  #interim {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    min-height: 16px;
+    font-style: italic;
+    padding: 0 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ── Feedback toggle ── */
+  #feedback-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 3px 9px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all var(--transition);
+    white-space: nowrap;
+  }
+  #feedback-toggle:hover { border-color: var(--primary); color: var(--primary); }
+  #feedback-toggle .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    display: none;
+  }
+  #feedback-toggle.has-feedback .dot { display: block; }
+
+  /* ── Setup screen ── */
+  #setup-screen {
+    position: absolute;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 20px;
+  }
+  #setup-screen.hidden { display: none; }
+
+  .setup-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 32px;
+    width: 100%;
+    max-width: 420px;
+  }
+  .setup-card h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--primary);
+  }
+  .setup-card .subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+  }
+  .form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .level-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .level-option {
+    background: var(--surface-alt);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: all var(--transition);
+    text-align: left;
+  }
+  .level-option:hover { border-color: var(--primary); }
+  .level-option.selected { border-color: var(--primary); background: var(--primary-glow); }
+  .level-option .lname { font-size: 13px; font-weight: 600; color: var(--text); }
+  .level-option .ldesc { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  #start-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: var(--radius);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: background var(--transition);
+  }
+  #start-btn:hover { background: var(--primary-dark); }
+  #start-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ── No-speech fallback notice ── */
+  .no-speech-notice {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    padding: 0 20px;
+  }
+
+  /* ── Loading dots ── */
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 10px 14px;
+  }
+  .typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: typingBounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBounce {
+    0%, 80%, 100% { transform: translateY(0); }
+    40%           { transform: translateY(-6px); opacity: 0.5; }
+  }
+
+  /* ── Responsive ── */
+  @media (max-width: 480px) {
+    .header-controls { gap: 4px; }
+    select { font-size: 12px; padding: 5px 24px 5px 8px; }
+    .msg { max-width: 92%; }
+    .setup-card { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ── Setup Screen ── -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h1>Conversation Trainer</h1>
+    <p class="subtitle">Practice speaking naturally in any language. Get real-time feedback tailored to your level.</p>
+
+    <div class="form-group">
+      <label>Language to practice</label>
+      <select id="lang-select">
+        <option value="" disabled selected>Select a language…</option>
+        <option value="English|en-US">English</option>
+        <option value="Spanish|es-ES">Spanish</option>
+        <option value="French|fr-FR">French</option>
+        <option value="German|de-DE">German</option>
+        <option value="Italian|it-IT">Italian</option>
+        <option value="Portuguese|pt-BR">Portuguese (Brazilian)</option>
+        <option value="Japanese|ja-JP">Japanese</option>
+        <option value="Mandarin Chinese|zh-CN">Mandarin Chinese</option>
+        <option value="Korean|ko-KR">Korean</option>
+        <option value="Arabic|ar-SA">Arabic</option>
+        <option value="Russian|ru-RU">Russian</option>
+        <option value="Dutch|nl-NL">Dutch</option>
+        <option value="Swedish|sv-SE">Swedish</option>
+        <option value="Norwegian|nb-NO">Norwegian</option>
+        <option value="Danish|da-DK">Danish</option>
+        <option value="Finnish|fi-FI">Finnish</option>
+        <option value="Polish|pl-PL">Polish</option>
+        <option value="Turkish|tr-TR">Turkish</option>
+        <option value="Hindi|hi-IN">Hindi</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Your native language (for feedback)</label>
+      <select id="native-select">
+        <option value="English">English</option>
+        <option value="Spanish">Spanish</option>
+        <option value="French">French</option>
+        <option value="German">German</option>
+        <option value="Portuguese">Portuguese</option>
+        <option value="Italian">Italian</option>
+        <option value="Mandarin Chinese">Mandarin Chinese</option>
+        <option value="Japanese">Japanese</option>
+        <option value="Korean">Korean</option>
+        <option value="Arabic">Arabic</option>
+        <option value="Russian">Russian</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Proficiency level</label>
+      <div class="level-options">
+        <div class="level-option" data-level="Beginner" onclick="selectLevel(this)">
+          <div class="lname">Beginner</div>
+          <div class="ldesc">Simple vocabulary, basic grammar</div>
+        </div>
+        <div class="level-option" data-level="Intermediate" onclick="selectLevel(this)">
+          <div class="lname">Intermediate</div>
+          <div class="ldesc">Grammar focus, vocabulary range</div>
+        </div>
+        <div class="level-option" data-level="Advanced" onclick="selectLevel(this)">
+          <div class="lname">Advanced</div>
+          <div class="ldesc">Fluency &amp; filler word tracking</div>
+        </div>
+        <div class="level-option" data-level="Fluent" onclick="selectLevel(this)">
+          <div class="lname">Fluent</div>
+          <div class="ldesc">Executive presence &amp; impact</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Topic picker — Beginner / Intermediate -->
+    <div id="topic-section" class="form-group" style="display:none;">
+      <label id="topic-label">Conversation topic</label>
+      <div id="topic-options" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;"></div>
+      <!-- Optional context (Intermediate: short presentations) -->
+      <div id="topic-context-area" style="display:none;margin-top:10px;">
+        <input id="topic-context-input" type="text" placeholder="Optional: e.g. 'I work in UX design' or 'I study medicine'"
+          style="width:100%;padding:9px 12px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box;outline:none;font-family:inherit;"
+          onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+    </div>
+
+    <!-- Scenario picker — Advanced / Fluent -->
+    <div id="scenario-section" class="form-group" style="display:none;">
+      <label id="scenario-label">Practice format</label>
+      <div id="scenario-options" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px;"></div>
+      <!-- Context inputs that appear for specific scenario types -->
+      <div id="scenario-context-area" style="display:none;margin-top:10px;"></div>
+    </div>
+
+    <button id="start-btn" onclick="startSession()" disabled>Start Practicing →</button>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<header>
+  <span class="logo">🗣 Conversation Trainer</span>
+  <div class="header-controls">
+    <span id="session-info" class="level-badge" style="display:none"></span>
+    <!-- Wrap Up first — highest priority so it's never clipped -->
+    <button id="wrapup-btn" onclick="wrapUpSession()" style="display:none;background:#7c3aed;border:none;color:#fff;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;font-weight:600;white-space:nowrap;">Wrap Up</button>
+    <button id="feedback-toggle" onclick="toggleFeedback()">
+      <span class="dot"></span>
+      Feedback
+      <span id="feedback-chevron">▲</span>
+    </button>
+    <button id="voice-toggle" onclick="toggleVoice()" title="Toggle Claude's voice" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">🔊</button>
+    <button onclick="showHistory()" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">📖</button>
+    <button onclick="showSetup()" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 10px;font-size:12px;cursor:pointer;">New</button>
+  </div>
+</header>
+
+<main>
+  <div id="thread">
+    <div class="welcome" id="welcome-msg">
+      <h2>Ready to practice!</h2>
+      <p>Start the session to begin your conversation. I'll adapt to your level and give you feedback after each exchange.</p>
+      <div class="hint">⬇ Tap the microphone or type to begin</div>
+    </div>
+  </div>
+
+  <!-- Feedback panel -->
+  <div id="feedback-panel">
+    <div class="feedback-inner" id="feedback-inner">
+      <p style="color:var(--muted);font-size:13px;">Feedback will appear here after your first exchange.</p>
+    </div>
+  </div>
+
+  <!-- Suggested phrases -->
+  <div id="phrases-bar">
+    <span class="phrases-label">Try saying:</span>
+  </div>
+</main>
+
+<!-- ── Full-viewport overlays (outside <main> so they cover header + input bar) ── -->
+
+<div id="summary-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:60;padding:32px 24px 40px;">
+  <div style="max-width:640px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+      <h2 style="margin:0;font-size:20px;color:var(--text);">Session Summary</h2>
+      <div style="display:flex;gap:8px;">
+        <button id="download-btn" onclick="downloadSummary()" style="display:none;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">⬇ Download</button>
+        <button onclick="closeSummary()" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✕ Close</button>
+      </div>
+    </div>
+    <div id="summary-content">
+      <div style="text-align:center;padding:60px 0;color:var(--muted);">
+        <div style="font-size:28px;margin-bottom:12px;">⏳</div>
+        <div>Compiling your session…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="history-overlay" style="display:none;position:fixed;inset:0;background:var(--bg);overflow-y:auto;z-index:60;padding:32px 24px 40px;">
+  <div style="max-width:640px;margin:0 auto;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;">
+      <h2 style="margin:0;font-size:20px;color:var(--text);">📖 Session History</h2>
+      <button onclick="closeHistory()" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;">✕ Close</button>
+    </div>
+    <div id="history-list"></div>
+    <div id="history-detail" style="display:none;">
+      <button onclick="backToHistoryList()" style="background:none;border:none;color:var(--accent);font-size:13px;cursor:pointer;padding:0 0 16px;">← Back to all sessions</button>
+      <div id="history-detail-content"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Input area -->
+<div id="input-area">
+  <div id="interim"></div>
+  <div class="mic-row">
+    <button id="mic-btn" onclick="toggleMic()" title="Click to speak">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+        <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="8" y1="23" x2="16" y2="23"/>
+      </svg>
+    </button>
+    <span class="mic-status" id="mic-status">Click to speak</span>
+  </div>
+
+  <div class="input-row">
+    <textarea id="text-input" placeholder="Or type here…" rows="1"
+      onkeydown="handleKeydown(event)" oninput="autoResize(this)"></textarea>
+    <button id="send-btn" onclick="sendText()" title="Send">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="22" y1="2" x2="11" y2="13"/>
+        <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      </svg>
+    </button>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let sessionId = null;
+let currentLevel = 'Beginner';
+let currentLang = '';
+let currentLangCode = '';
+let currentNative = '';
+let selectedLevel = null;
+let selectedScenario = '';  // '' = free conversation, or scenario key
+let selectedTopic = '';     // '' = free conversation, or topic key
+let micState = 'idle'; // idle | listening | processing | speaking
+let mediaRecorder = null;
+let audioChunks = [];
+let silenceCheckInterval = null;
+let synth = window.speechSynthesis;
+let voices = [];
+let isMicAvailable = !!(navigator.mediaDevices && window.MediaRecorder);
+let feedbackOpen = false;
+let lastFeedback = null;
+let turnCount = 0;
+let voiceEnabled = true;
+
+// Load voices (async on first call)
+if (synth) {
+  synth.onvoiceschanged = () => { voices = synth.getVoices(); };
+  voices = synth.getVoices();
+}
+
+// ─────────────────────────────────────────────
+// Setup screen
+// ─────────────────────────────────────────────
+// ── Topic / scenario data ────────────────────────────────────────────────────
+const TOPICS_BY_LEVEL = {
+  Beginner: [
+    { key: '',            icon: '💬', label: 'Free conversation',   desc: 'Open-ended practice' },
+    { key: 'getting_by',  icon: '🧳', label: 'Getting By',          desc: 'Transport, hotels, directions' },
+    { key: 'meeting',     icon: '👋', label: 'Meeting People',      desc: 'Introductions, getting to know' },
+    { key: 'smalltalk',   icon: '☕', label: 'Small Talk',          desc: 'Weather, routines, daily life' },
+    { key: 'food',        icon: '🍽', label: 'Food & Dining',       desc: 'Restaurants, ordering, cooking' },
+    { key: 'shopping',    icon: '🛍', label: 'Shopping & Services', desc: 'Prices, shops, services' },
+  ],
+  Intermediate: [
+    { key: '',              icon: '💬', label: 'Free conversation',      desc: 'Open-ended practice' },
+    { key: 'flirting',      icon: '💝', label: 'Flirting & Romance',     desc: 'Compliments, banter, charm' },
+    { key: 'work',          icon: '💼', label: 'Work & Studies',         desc: 'Jobs, careers, studying' },
+    { key: 'leisure',       icon: '🎯', label: 'Leisure & Hobbies',      desc: 'Sport, travel, culture, weekends' },
+    { key: 'relationships', icon: '🤝', label: 'Relationships',          desc: 'Friends, family, feelings' },
+    { key: 'presentations', icon: '🎤', label: 'Short Presentations',    desc: 'Present yourself or your work' },
+  ],
+};
+
+const SCENARIOS_BY_LEVEL = {
+  Advanced: [
+    { key: '',              icon: '💬', label: 'Free conversation',           desc: 'Open-ended practice' },
+    { key: 'pitch',         icon: '💡', label: 'Pitch an idea',               desc: 'Sell a concept or project' },
+    { key: 'findings',      icon: '📊', label: 'Present findings',            desc: 'Data, results, research' },
+    { key: 'discuss_depth', icon: '🌐', label: 'Discuss a topic at depth',    desc: 'Debate, argue, explore ideas' },
+    { key: 'difficult',     icon: '🔥', label: 'Difficult conversation',      desc: 'Conflict, feedback, saying no' },
+    { key: 'job_interview', icon: '🧑‍💼', label: 'Job interview',              desc: 'Structured interview practice' },
+  ],
+  Fluent: [
+    { key: '',              icon: '💬', label: 'Free conversation',           desc: 'Open-ended practice' },
+    { key: 'negotiate',     icon: '🤝', label: 'Negotiate',                   desc: 'Position, trade-offs, deals' },
+    { key: 'inspire',       icon: '📣', label: 'Inspire & motivate',          desc: 'Rally a team or audience' },
+    { key: 'brief',         icon: '📋', label: 'Brief a team',                desc: 'Inform, align, assign' },
+    { key: 'crisis',        icon: '🔴', label: 'Crisis & controversy',        desc: 'Defend under hostile questioning' },
+    { key: 'exec_self',     icon: '🪞', label: 'Executive self-presentation', desc: 'Board rooms, senior intros' },
+  ],
+};
+
+// Context inputs required by certain scenario types
+const SCENARIO_CONTEXT_HTML = {
+  job_interview: `
+    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Job posting URL or description</label>
+    <input id="ctx-job-url" type="url" placeholder="https://company.com/jobs/…"
+      style="width:100%;padding:9px 12px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box;outline:none;font-family:inherit;margin-bottom:6px;"
+      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+    <textarea id="ctx-job-text" rows="2" placeholder="Or paste the job description here…"
+      style="width:100%;padding:9px 12px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box;outline:none;font-family:inherit;resize:none;"
+      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'"></textarea>`,
+  exec_self: `
+    <label style="font-size:12px;color:var(--muted);display:block;margin-bottom:6px;">Setting & audience <span style="font-style:italic;">(optional)</span></label>
+    <input id="ctx-exec" type="text" placeholder="e.g. 'New board member intro' or 'Conference keynote opening'"
+      style="width:100%;padding:9px 12px;background:var(--surface-alt);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;box-sizing:border-box;outline:none;font-family:inherit;"
+      onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">`,
+};
+
+// ── Picker rendering ──────────────────────────────────────────────────────────
+
+function renderTopicPicker(level) {
+  const items = TOPICS_BY_LEVEL[level] || [];
+  document.getElementById('topic-options').innerHTML = items.map(t => `
+    <div class="topic-opt${t.key === '' ? ' _selected' : ''}" data-topic="${t.key}" onclick="selectTopic(this)"
+         style="padding:10px 12px;border-radius:8px;border:2px solid ${t.key === '' ? 'var(--accent)' : 'var(--border)'};background:var(--surface-alt);cursor:pointer;font-size:13px;">
+      <div style="font-size:16px;margin-bottom:3px;">${t.icon}</div>
+      <div style="font-weight:600;">${t.label}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${t.desc}</div>
+    </div>`).join('');
+}
+
+function renderScenarioPicker(level) {
+  const items = SCENARIOS_BY_LEVEL[level] || [];
+  document.getElementById('scenario-options').innerHTML = items.map(s => `
+    <div class="scenario-opt${s.key === '' ? ' _selected' : ''}" data-scenario="${s.key}" onclick="selectScenario(this)"
+         style="padding:10px 12px;border-radius:8px;border:2px solid ${s.key === '' ? 'var(--accent)' : 'var(--border)'};background:var(--surface-alt);cursor:pointer;font-size:13px;">
+      <div style="font-size:16px;margin-bottom:3px;">${s.icon}</div>
+      <div style="font-weight:600;">${s.label}</div>
+      <div style="font-size:11px;color:var(--muted);margin-top:2px;">${s.desc}</div>
+    </div>`).join('');
+}
+
+// ── Level selection ───────────────────────────────────────────────────────────
+
+function selectLevel(el) {
+  document.querySelectorAll('.level-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedLevel = el.dataset.level;
+  const isBegInter  = selectedLevel === 'Beginner'  || selectedLevel === 'Intermediate';
+  const isAdvFluent = selectedLevel === 'Advanced'  || selectedLevel === 'Fluent';
+
+  document.getElementById('topic-section').style.display    = isBegInter  ? '' : 'none';
+  document.getElementById('scenario-section').style.display = isAdvFluent ? '' : 'none';
+
+  if (isBegInter) {
+    selectedTopic = ''; selectedScenario = '';
+    renderTopicPicker(selectedLevel);
+    document.getElementById('topic-context-area').style.display = 'none';
+  }
+  if (isAdvFluent) {
+    selectedScenario = ''; selectedTopic = '';
+    renderScenarioPicker(selectedLevel);
+    document.getElementById('scenario-context-area').style.display = 'none';
+    document.getElementById('scenario-context-area').innerHTML = '';
+  }
+  updateStartBtn();
+}
+
+// ── Topic selection ───────────────────────────────────────────────────────────
+
+function selectTopic(el) {
+  document.querySelectorAll('.topic-opt').forEach(o => o.style.border = '2px solid var(--border)');
+  el.style.border = '2px solid var(--accent)';
+  selectedTopic = el.dataset.topic;
+  // Show optional context field only for "presentations"
+  const ctx = document.getElementById('topic-context-area');
+  ctx.style.display = selectedTopic === 'presentations' ? '' : 'none';
+}
+
+function resetTopicPicker() {
+  document.querySelectorAll('.topic-opt').forEach(o => {
+    o.style.border = `2px solid ${o.dataset.topic === '' ? 'var(--accent)' : 'var(--border)'}`;
+  });
+  selectedTopic = '';
+  document.getElementById('topic-context-area').style.display = 'none';
+}
+
+// ── Scenario selection ────────────────────────────────────────────────────────
+
+function selectScenario(el) {
+  document.querySelectorAll('.scenario-opt').forEach(o => o.style.border = '2px solid var(--border)');
+  el.style.border = '2px solid var(--accent)';
+  selectedScenario = el.dataset.scenario;
+  const ctxArea = document.getElementById('scenario-context-area');
+  const html = SCENARIO_CONTEXT_HTML[selectedScenario];
+  if (html) {
+    ctxArea.innerHTML = html;
+    ctxArea.style.display = '';
+  } else {
+    ctxArea.innerHTML = '';
+    ctxArea.style.display = 'none';
+  }
+}
+
+function resetScenarioPicker() {
+  document.querySelectorAll('.scenario-opt').forEach(o => {
+    o.style.border = `2px solid ${o.dataset.scenario === '' ? 'var(--accent)' : 'var(--border)'}`;
+  });
+  selectedScenario = '';
+  const ctxArea = document.getElementById('scenario-context-area');
+  ctxArea.innerHTML = '';
+  ctxArea.style.display = 'none';
+}
+
+function getScenarioContext() {
+  if (selectedScenario === 'job_interview') {
+    const url  = document.getElementById('ctx-job-url')?.value.trim()  || '';
+    const text = document.getElementById('ctx-job-text')?.value.trim() || '';
+    return url || text || '';
+  }
+  if (selectedScenario === 'exec_self') {
+    return document.getElementById('ctx-exec')?.value.trim() || '';
+  }
+  if (selectedTopic === 'presentations') {
+    return document.getElementById('topic-context-input')?.value.trim() || '';
+  }
+  return '';
+}
+
+function updateStartBtn() {
+  const langVal = document.getElementById('lang-select').value;
+  document.getElementById('start-btn').disabled = !langVal || !selectedLevel;
+}
+document.getElementById('lang-select').addEventListener('change', updateStartBtn);
+
+async function startSession() {
+  const langVal = document.getElementById('lang-select').value;
+  if (!langVal || !selectedLevel) return;
+
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+
+  try {
+    const [langName, langCode] = langVal.split('|');
+    const nativeLang = document.getElementById('native-select').value;
+
+    const res = await fetch('/session/create', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        target_language: langName,
+        language_code: langCode,
+        native_language: nativeLang,
+        level: selectedLevel,
+        topic: selectedTopic || null,
+        scenario_type: selectedScenario || null,
+        scenario_context: getScenarioContext() || null
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Server error ${res.status}`);
+    }
+    const data = await res.json();
+
+    sessionId = data.session_id;
+    currentLevel = selectedLevel;
+    currentLang = langName;
+    currentLangCode = langCode;
+    currentNative = nativeLang;
+
+    // Hide setup — transition to session view
+    document.getElementById('setup-screen').classList.add('hidden');
+    const badge = document.getElementById('session-info');
+    badge.textContent = `${langName} · ${selectedLevel}`;
+    badge.className = `level-badge badge-${selectedLevel.toLowerCase()}`;
+    badge.style.display = '';
+
+    if (!isMicAvailable) {
+      document.getElementById('mic-btn').disabled = true;
+      document.getElementById('mic-status').textContent = 'Type to chat';
+    }
+
+    // Auto-open feedback panel
+    if (!feedbackOpen) toggleFeedback();
+
+    // Fetch scenario brief (if applicable), then open with Claude
+    if (selectedScenario) await loadScenarioBrief();
+    await claudeOpener();
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = 'Start Practicing →';
+    alert('Could not start session: ' + (e.message || 'Server unreachable. Is the server running?'));
+  }
+}
+
+// ─── Session wrap-up ──────────────────────────────────────────────────────
+async function wrapUpSession() {
+  if (!sessionId) return;
+  document.getElementById('summary-overlay').style.display = 'block';
+  document.getElementById('summary-content').innerHTML = `
+    <div style="text-align:center;padding:60px 0;color:var(--muted);">
+      <div style="font-size:28px;margin-bottom:12px;">⏳</div>
+      <div>Compiling your session…</div>
+    </div>`;
+  try {
+    const res = await fetch(`/session/${sessionId}/summary`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'Summary failed');
+    }
+    const s = await res.json();
+    _lastSummaryData = { summary: s, lang: currentLang, level: currentLevel, date: new Date().toISOString() };
+    renderSummary(s);
+    document.getElementById('download-btn').style.display = '';
+  } catch(e) {
+    document.getElementById('summary-content').innerHTML =
+      `<p style="color:var(--error)">Could not generate summary: ${e.message}</p>`;
+  }
+}
+
+let _lastSummaryData = null;
+
+function closeSummary() {
+  document.getElementById('summary-overlay').style.display = 'none';
+}
+
+// ─── Download summary ──────────────────────────────────────────────────────
+function downloadSummary() {
+  if (!_lastSummaryData) return;
+  const { summary: s, lang, level, date } = _lastSummaryData;
+  const fmt = d => new Date(d).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+
+  const strengthsHtml = (s.strengths || []).map(x =>
+    `<div class="card green"><strong>${x.title}</strong><p>${x.detail}</p></div>`).join('');
+  const devHtml = (s.development_areas || []).map(x =>
+    `<div class="card amber"><strong>${x.title}</strong><p>${x.detail}</p><em>💡 ${x.tip}</em></div>`).join('');
+  const vocabRows = (s.new_vocabulary || []).map(x =>
+    `<tr><td><strong>${x.word}</strong></td><td>${x.translation}</td><td><em>${x.example}</em></td></tr>`).join('');
+  const rec = s.level_recommendation || { action: 'stay', reasoning: '' };
+  const recLabel = { stay: '✅ Stay at this level', step_up: '⬆️ Ready to level up', step_down: '⬇️ Consider stepping down' }[rec.action] || '';
+
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<title>Session Summary — ${lang} ${level} — ${fmt(date)}</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 700px; margin: 40px auto; padding: 0 24px; color: #1a1a2e; line-height: 1.6; }
+  h1 { font-size: 22px; } h2 { font-size: 15px; text-transform: uppercase; letter-spacing: .06em; margin: 28px 0 10px; }
+  .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .closing { background: #f5f5ff; border-radius: 10px; padding: 16px; margin-bottom: 24px; font-size: 14px; }
+  .card { border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; font-size: 13px; }
+  .green { background: #f0fdf4; border-left: 3px solid #10b981; }
+  .amber { background: #fffbeb; border-left: 3px solid #f59e0b; }
+  .card p, .card em { margin: 4px 0 0; color: #555; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; padding: 8px; background: #f5f5f5; }
+  td { padding: 8px; border-bottom: 1px solid #eee; }
+  .rec { background: #f5f5ff; border-radius: 8px; padding: 14px; font-size: 13px; margin-top: 24px; }
+  footer { color: #aaa; font-size: 11px; margin-top: 40px; text-align: center; }
+</style></head><body>
+<h1>🗣 Conversation Trainer — Session Summary</h1>
+<div class="meta">${lang} · ${level} · ${fmt(date)}</div>
+<div class="closing">${s.closing_message || ''}</div>
+<h2>What went well</h2>${strengthsHtml}
+<h2>Focus for next time</h2>${devHtml}
+${vocabRows ? `<h2>Vocabulary from this session</h2><table><tr><th>Word</th><th>Meaning</th><th>Example</th></tr>${vocabRows}</table>` : ''}
+<div class="rec"><strong>${recLabel}</strong><br><span style="color:#555">${rec.reasoning}</span></div>
+<footer>Generated by Conversation Trainer</footer>
+</body></html>`;
+
+  const blob = new Blob([html], { type: 'text/html' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `session-${lang}-${level}-${fmt(date).replace(/\s/g,'-')}.html`.toLowerCase();
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function buildSummaryHTML(s) {
+  const levelIcons  = { stay: '✅', step_up: '⬆️', step_down: '⬇️' };
+  const levelLabels = { stay: 'Stay at this level', step_up: 'Ready to level up', step_down: 'Consider stepping down' };
+
+  const strengths = (s.strengths || []).map(x => `
+    <div style="margin-bottom:10px;padding:12px;background:rgba(16,185,129,.08);border-radius:8px;border-left:3px solid #10b981;">
+      <div style="font-weight:600;font-size:13px;margin-bottom:3px;">${x.title}</div>
+      <div style="font-size:13px;color:var(--muted);">${x.detail}</div>
+    </div>`).join('');
+
+  const devAreas = (s.development_areas || []).map(x => `
+    <div style="margin-bottom:10px;padding:12px;background:rgba(245,158,11,.07);border-radius:8px;border-left:3px solid #f59e0b;">
+      <div style="font-weight:600;font-size:13px;margin-bottom:3px;">${x.title}</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:5px;">${x.detail}</div>
+      <div style="font-size:12px;color:#f59e0b;font-style:italic;">💡 ${x.tip}</div>
+    </div>`).join('');
+
+  const vocab = (s.new_vocabulary || []).map(x => `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <span style="font-weight:600;font-size:14px;">${x.word}</span>
+        <span style="color:var(--muted);font-size:13px;margin-left:8px;">— ${x.translation}</span>
+        <div style="font-size:12px;color:var(--muted);font-style:italic;margin-top:3px;">${x.example}</div>
+      </div>
+    </div>`).join('');
+
+  const rec = s.level_recommendation || { action: 'stay', reasoning: '' };
+
+  return `
+    <div style="margin-bottom:28px;padding:16px;background:var(--surface-alt);border-radius:10px;border:1px solid var(--border);">
+      <div style="font-size:13px;line-height:1.6;color:var(--text);">${s.closing_message || ''}</div>
+    </div>
+    <h3 style="font-size:14px;font-weight:700;color:var(--text);margin:0 0 10px;text-transform:uppercase;letter-spacing:.06em;">What went well</h3>
+    ${strengths || '<p style="color:var(--muted);font-size:13px;">No data.</p>'}
+    <h3 style="font-size:14px;font-weight:700;color:var(--text);margin:20px 0 10px;text-transform:uppercase;letter-spacing:.06em;">Focus for next time</h3>
+    ${devAreas || '<p style="color:var(--muted);font-size:13px;">No data.</p>'}
+    ${vocab ? `
+    <h3 style="font-size:14px;font-weight:700;color:var(--text);margin:20px 0 10px;text-transform:uppercase;letter-spacing:.06em;">Vocabulary from this session</h3>
+    <div style="border-top:1px solid var(--border);">${vocab}</div>` : ''}
+    <div style="margin-top:24px;padding:14px;border-radius:8px;background:var(--surface-alt);border:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;">
+      <span style="font-size:18px;">${levelIcons[rec.action] || '✅'}</span>
+      <div>
+        <div style="font-weight:600;font-size:13px;margin-bottom:3px;">${levelLabels[rec.action] || 'Stay at this level'}</div>
+        <div style="font-size:12px;color:var(--muted);">${rec.reasoning}</div>
+      </div>
+    </div>`;
+}
+
+function renderSummary(s) {
+  document.getElementById('summary-content').innerHTML =
+    buildSummaryHTML(s) + `
+    <div style="margin-top:24px;display:flex;gap:10px;">
+      <button onclick="closeSummary()" style="flex:1;background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;">Continue session</button>
+      <button onclick="showSetup()" style="flex:1;background:#7c3aed;border:none;color:#fff;border-radius:8px;padding:10px;font-size:13px;cursor:pointer;font-weight:600;">New session</button>
+    </div>`;
+}
+
+// ─── History ──────────────────────────────────────────────────────────────
+async function showHistory() {
+  document.getElementById('history-overlay').style.display = 'block';
+  document.getElementById('history-detail').style.display = 'none';
+  document.getElementById('history-list').style.display = 'block';
+  document.getElementById('history-list').innerHTML =
+    `<div style="text-align:center;padding:40px 0;color:var(--muted);">Loading…</div>`;
+  try {
+    const res = await fetch('/history');
+    const { entries } = await res.json();
+    if (!entries.length) {
+      document.getElementById('history-list').innerHTML =
+        `<p style="color:var(--muted);text-align:center;padding:40px 0;">No sessions yet. Wrap up a session to see it here.</p>`;
+      return;
+    }
+    document.getElementById('history-list').innerHTML = entries.map(e => {
+      const d = new Date(e.date).toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric' });
+      const levelColor = { Beginner:'#10b981', Intermediate:'#3b82f6', Advanced:'#f59e0b', Fluent:'#ef4444' }[e.level] || '#888';
+      return `<div id="hentry-${e.file}" style="padding:14px 16px;margin-bottom:10px;
+          background:var(--surface-alt);border:1px solid var(--border);border-radius:10px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div onclick="loadHistoryEntry('${e.file}')" style="flex:1;cursor:pointer;min-width:0;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span style="font-weight:600;font-size:14px;">${e.target_language}</span>
+              <span style="font-size:11px;font-weight:600;padding:2px 7px;border-radius:10px;color:#fff;background:${levelColor};">${e.level}</span>
+              <span style="font-size:12px;color:var(--muted);">${d} · ${e.turn_count} turns</span>
+            </div>
+            ${e.closing_message ? `<div style="font-size:12px;color:var(--muted);margin-top:6px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;">${e.closing_message}</div>` : ''}
+          </div>
+          <button onclick="deleteHistoryEntry('${e.file}')" title="Delete this session"
+            style="flex-shrink:0;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 8px;font-size:12px;cursor:pointer;transition:all .15s;"
+            onmouseover="this.style.borderColor='#ef4444';this.style.color='#ef4444'"
+            onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--muted)'">🗑</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(err) {
+    document.getElementById('history-list').innerHTML =
+      `<p style="color:var(--error)">Could not load history: ${err.message}</p>`;
+  }
+}
+
+async function deleteHistoryEntry(file) {
+  if (!confirm('Delete this session summary? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`/history/${encodeURIComponent(file)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Delete failed');
+    // Remove the card from the DOM without reloading the whole list
+    document.getElementById(`hentry-${file}`)?.remove();
+    // If list is now empty, show the empty state
+    if (!document.getElementById('history-list').querySelector('[id^="hentry-"]')) {
+      document.getElementById('history-list').innerHTML =
+        `<p style="color:var(--muted);text-align:center;padding:40px 0;">No sessions yet. Wrap up a session to see it here.</p>`;
+    }
+  } catch(err) {
+    alert('Could not delete: ' + err.message);
+  }
+}
+
+async function loadHistoryEntry(file) {
+  document.getElementById('history-list').style.display = 'none';
+  document.getElementById('history-detail').style.display = 'block';
+  document.getElementById('history-detail-content').innerHTML =
+    `<div style="text-align:center;padding:40px 0;color:var(--muted);">Loading…</div>`;
+  try {
+    const res = await fetch(`/history/${encodeURIComponent(file)}`);
+    const entry = await res.json();
+    const s = entry.summary;
+    const d = new Date(entry.date).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
+    // Reuse renderSummary logic but inject into history-detail-content
+    _lastSummaryData = { summary: s, lang: entry.target_language, level: entry.level, date: entry.date };
+    document.getElementById('history-detail-content').innerHTML =
+      `<div style="margin-bottom:12px;font-size:13px;color:var(--muted);">${entry.target_language} · ${entry.level} · ${d} · ${entry.turn_count} turns</div>` +
+      buildSummaryHTML(s) +
+      `<div style="margin-top:20px;"><button onclick="downloadSummary()" style="background:var(--surface-alt);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 16px;font-size:13px;cursor:pointer;">⬇ Download this summary</button></div>`;
+  } catch(err) {
+    document.getElementById('history-detail-content').innerHTML =
+      `<p style="color:var(--error)">Could not load entry: ${err.message}</p>`;
+  }
+}
+
+function backToHistoryList() {
+  document.getElementById('history-detail').style.display = 'none';
+  document.getElementById('history-list').style.display = 'block';
+}
+
+function closeHistory() {
+  document.getElementById('history-overlay').style.display = 'none';
+}
+
+function showSetup() {
+  // Terminate current session on the server before starting a new one
+  if (sessionId) {
+    fetch(`/session/${sessionId}`, { method: 'DELETE' }).catch(() => {});
+    sessionId = null;
+  }
+  synth?.cancel();  // stop any in-progress TTS
+  document.getElementById('setup-screen').classList.remove('hidden');
+  // Reset form
+  document.querySelectorAll('.level-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('lang-select').value = '';
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('start-btn').textContent = 'Start Practicing →';
+  selectedLevel = null;
+  document.getElementById('session-info').style.display = 'none';
+  // Clear thread
+  clearThread();
+}
+
+function clearThread() {
+  const thread = document.getElementById('thread');
+  thread.innerHTML = '<div class="welcome" id="welcome-msg"><h2>Ready to practice!</h2><p>Start the session to begin your conversation.</p><div class="hint">⬇ Tap the microphone or type to begin</div></div>';
+  document.getElementById('feedback-panel').classList.remove('open');
+  document.getElementById('phrases-bar').classList.remove('visible');
+  document.getElementById('phrases-bar').innerHTML = '<span class="phrases-label">Try saying:</span>';
+  document.getElementById('feedback-inner').innerHTML = '<p style="color:var(--muted);font-size:13px;">Feedback will appear here after your first exchange.</p>';
+  document.getElementById('feedback-toggle').classList.remove('has-feedback');
+  feedbackOpen = false;
+  lastFeedback = null;
+  turnCount = 0;
+  document.getElementById('wrapup-btn').style.display = 'none';
+  document.getElementById('summary-overlay').style.display = 'none';
+  document.getElementById('feedback-chevron').textContent = '▲';
+  document.getElementById('topic-section').style.display = 'none';
+  document.getElementById('scenario-section').style.display = 'none';
+  resetTopicPicker();
+  resetScenarioPicker();
+  selectedTopic = '';
+  currentScenario = null;
+}
+
+// ─────────────────────────────────────────────
+// Scenario brief
+// ─────────────────────────────────────────────
+let currentScenario = null;
+
+async function loadScenarioBrief() {
+  removeWelcome();
+  // Show a loading card while Claude generates the brief
+  const loadingId = 'scenario-loading';
+  document.getElementById('thread').insertAdjacentHTML('beforeend', `
+    <div id="${loadingId}" style="margin:16px 0;padding:16px;background:var(--surface-alt);border:1px solid var(--border);border-radius:12px;color:var(--muted);font-size:13px;text-align:center;">
+      ⏳ Generating your scenario…
+    </div>`);
+  try {
+    const res = await fetch(`/session/${sessionId}/scenario`, { method: 'POST' });
+    if (!res.ok) throw new Error('Could not generate scenario');
+    currentScenario = await res.json();
+    document.getElementById(loadingId)?.remove();
+    renderMissionCard(currentScenario);
+  } catch(e) {
+    document.getElementById(loadingId)?.remove();
+    addSystemMessage('Could not load scenario. Continuing as free conversation.');
+    currentScenario = null;
+  }
+}
+
+function renderMissionCard(sc) {
+  const stype = sc.type || '';
+  let body = '';
+
+  if (stype === 'discuss_depth') {
+    body = `
+      <div style="font-size:17px;font-weight:700;line-height:1.4;margin-bottom:10px;color:var(--text);">"${sc.statement || ''}"</div>
+      <div style="font-size:13px;color:var(--muted);margin-bottom:8px;">${sc.context || ''}</div>`;
+
+  } else if (stype === 'job_interview') {
+    const reqs = (sc.key_requirements || []).map(r => `<li style="margin-bottom:4px;">${r}</li>`).join('');
+    body = `
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Role</span><br><strong>${sc.role || ''}</strong> — ${sc.company || ''}</div>
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Team</span><br>${sc.team_context || ''}</div>
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Interview style</span><br>${sc.interview_style || ''}</div>
+      <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Key requirements</span>
+        <ul style="margin:6px 0 0 16px;padding:0;">${reqs}</ul></div>`;
+
+  } else if (stype === 'exec_self') {
+    body = `
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Setting</span><br>${sc.setting || ''}</div>
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Audience</span><br>${sc.audience || ''}</div>
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Objective</span><br>${sc.objective || ''}</div>
+      <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Time pressure</span><br>${sc.time_pressure || ''}</div>`;
+
+  } else {
+    // Default: scenario card with bullet points
+    const bullets = (sc.bullet_points || []).map(b => `<li style="margin-bottom:5px;">${b}</li>`).join('');
+    body = `
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Your role</span><br>${sc.your_role || ''}</div>
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Speaking to</span><br>${sc.audience || ''}</div>
+      <div style="margin-bottom:8px;"><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Objective</span><br>${sc.objective || ''}</div>
+      <div><span style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Your material</span>
+        <ul style="margin:6px 0 0 16px;padding:0;">${bullets}</ul></div>`;
+  }
+
+  const titleText = stype === 'discuss_depth' ? 'Topic to debate' :
+                    stype === 'job_interview'  ? `Interview: ${sc.role || ''}` :
+                    stype === 'exec_self'       ? 'Your stage' :
+                    (sc.title || 'Your mission');
+
+  const html = `
+    <div id="mission-card" style="margin:16px 0;border-radius:12px;overflow:hidden;border:1px solid rgba(124,58,237,.4);background:linear-gradient(135deg,rgba(124,58,237,.08),rgba(59,130,246,.06));">
+      <div style="padding:10px 16px;background:rgba(124,58,237,.15);display:flex;align-items:center;gap:8px;">
+        <span style="font-size:14px;">📋</span>
+        <span style="font-weight:700;font-size:13px;color:var(--text);">${titleText}</span>
+      </div>
+      <div style="padding:14px 16px;font-size:13px;line-height:1.6;">${body}</div>
+    </div>`;
+  document.getElementById('thread').insertAdjacentHTML('beforeend', html);
+}
+
+// ─────────────────────────────────────────────
+// Claude opener message
+// ─────────────────────────────────────────────
+async function claudeOpener() {
+  removeWelcome();
+  const typingEl = addTypingIndicator();
+  try {
+    const topicOpeners = {
+      // Beginner
+      getting_by:    `Set the scene in a practical travel situation — airport, hotel desk, or asking for directions. Open in ${currentLang}, no preamble.`,
+      meeting:       `We're meeting for the first time. Open with a warm natural introduction in ${currentLang} — just start talking to me.`,
+      smalltalk:     `Start a light piece of everyday small talk in ${currentLang} — weather, weekend, daily life. Just begin.`,
+      food:          `Set the scene in a food context — café, restaurant, or market. Open in ${currentLang} naturally.`,
+      shopping:      `Set the scene in a shop or service counter. Open in ${currentLang} as staff or a helpful stranger.`,
+      // Intermediate
+      flirting:      `We've just noticed each other. Open with something charming and playful in ${currentLang} — no explaining, just be in the moment.`,
+      work:          `Start a casual conversation about work or studies in ${currentLang}. Ask me about my work and build on what I share.`,
+      leisure:       `Start a conversation about free time and hobbies in ${currentLang}. Ask what I enjoy and follow wherever I take it.`,
+      relationships: `Open a warm personal conversation in ${currentLang} — ask about someone important to me and be genuinely curious.`,
+      presentations: `I'm going to give you a short presentation or introduction. Open by setting the scene — who you are and why you're listening — in ${currentLang}.`,
+    };
+    const scenarioOpeners = {
+      discuss_depth:  `The topic is set. Open the debate — challenge me to take a position on the statement. One sharp question, no preamble.`,
+      job_interview:  `The interview brief is set. You are the interviewer. Open the interview naturally in ${currentLang} — start with a brief welcome and your first question.`,
+      exec_self:      `The scenario is set. You are in the room. Open naturally — give me my cue to introduce myself.`,
+    };
+    const prompt = currentScenario
+      ? (scenarioOpeners[currentScenario.type] || `The scenario has been set. Step into your audience role immediately and open the conversation. Do not describe the scenario back to me; just start the interaction.`)
+      : (selectedTopic && topicOpeners[selectedTopic])
+        ? topicOpeners[selectedTopic]
+        : `Let's start! Please greet me warmly in ${currentLang} and invite me to begin our conversation practice.`;
+    const data = await callAPI(prompt);
+    typingEl.remove();
+    renderClaudeMessage(data, true);
+    speak(data.reply);
+  } catch(e) {
+    typingEl.remove();
+    addSystemMessage('Could not connect. Check that the server is running and your ANTHROPIC_API_KEY is set.');
+  }
+}
+
+// ─────────────────────────────────────────────
+// API call
+// ─────────────────────────────────────────────
+async function callAPI(transcript, enrichedTranscript, speakingRateWpm) {
+  const body = { session_id: sessionId, transcript };
+  if (enrichedTranscript) body.enriched_transcript = enrichedTranscript;
+  if (speakingRateWpm)    body.speaking_rate_wpm   = speakingRateWpm;
+  const res = await fetch('/session/message', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'API error');
+  }
+  return res.json();
+}
+
+// ─────────────────────────────────────────────
+// Audio recording + Whisper transcription
+// ─────────────────────────────────────────────
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+    // Silence detection via Web Audio API
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    source.connect(analyser);
+    const buf = new Float32Array(analyser.fftSize);
+    const THRESHOLD = 0.015;   // RMS level considered "silence"
+    const SILENCE_MS = 3500;   // Stop after 3.5 s of silence post-speech
+    let hasSpeech = false, silenceMs = 0;
+
+    silenceCheckInterval = setInterval(() => {
+      analyser.getFloatTimeDomainData(buf);
+      const rms = Math.sqrt(buf.reduce((s, v) => s + v * v, 0) / buf.length);
+      if (rms > THRESHOLD) { hasSpeech = true; silenceMs = 0; }
+      else if (hasSpeech) {
+        silenceMs += 100;
+        if (silenceMs >= SILENCE_MS) stopRecording();
+      }
+    }, 100);
+
+    mediaRecorder = new MediaRecorder(stream);
+    audioChunks = [];
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      clearInterval(silenceCheckInterval);
+      audioCtx.close();
+      stream.getTracks().forEach(t => t.stop());
+      await submitAudio(new Blob(audioChunks, { type: 'audio/webm' }));
+    };
+
+    mediaRecorder.start(100);
+    setMicState('listening');
+    document.getElementById('interim').textContent = 'Listening…';
+  } catch(e) {
+    setMicState('idle');
+    document.getElementById('interim').textContent =
+      e.name === 'NotAllowedError' ? 'Microphone permission denied.' : 'Cannot access microphone.';
+  }
+}
+
+function stopRecording() {
+  clearInterval(silenceCheckInterval);
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+    mediaRecorder.stop();
+    setMicState('processing');
+    document.getElementById('interim').textContent = 'Transcribing…';
+  }
+}
+
+async function submitAudio(blob) {
+  if (blob.size < 2000) {   // Too small — no real speech
+    setMicState('idle');
+    document.getElementById('interim').textContent = '';
+    return;
+  }
+  const form = new FormData();
+  form.append('audio', blob, 'recording.webm');
+  // Pass both languages so Whisper can handle code-switching
+  const params = new URLSearchParams();
+  if (currentLang)   params.set('target_language', currentLang);
+  if (currentNative) params.set('native_language', currentNative);
+  const url = `/transcribe?${params.toString()}`;
+  try {
+    const res = await fetch(url, { method: 'POST', body: form });
+    const data = await res.json();
+    document.getElementById('interim').textContent = '';
+    if (data.transcript && data.transcript.trim()) {
+      handleTranscript(
+        data.transcript.trim(),
+        data.enriched_transcript || null,
+        data.speaking_rate_wpm  || null
+      );
+    } else {
+      setMicState('idle');
+    }
+  } catch(e) {
+    setMicState('idle');
+    document.getElementById('interim').textContent = 'Transcription failed. Try again or type below.';
+  }
+}
+
+function toggleMic() {
+  if (!sessionId) return;
+  if (micState === 'processing' || micState === 'speaking') return;
+  if (micState === 'listening') stopRecording();
+  else if (isMicAvailable) startRecording();
+}
+
+function setMicState(state) {
+  micState = state;
+  const btn = document.getElementById('mic-btn');
+  const status = document.getElementById('mic-status');
+  btn.className = state === 'idle' ? '' : state;
+  btn.disabled = (state === 'processing' || state === 'speaking');
+
+  const labels = {
+    idle: 'Click to speak',
+    listening: 'Listening… (click to stop)',
+    processing: 'Thinking…',
+    speaking: 'Claude is speaking…'
+  };
+  status.textContent = labels[state] || '';
+  status.className = 'mic-status ' + (state !== 'idle' ? state : '');
+}
+
+// ─────────────────────────────────────────────
+// Message handling
+// ─────────────────────────────────────────────
+async function handleTranscript(transcript, enrichedTranscript, speakingRateWpm) {
+  if (!transcript || !sessionId) return;
+  setMicState('processing');
+  removeWelcome();
+  addUserMessage(transcript);  // always show raw transcript in UI
+
+  const typingEl = addTypingIndicator();
+  try {
+    const data = await callAPI(transcript, enrichedTranscript, speakingRateWpm);
+    typingEl.remove();
+    renderClaudeMessage(data);
+    renderFeedback(data);
+    renderPhrases(data.suggested_phrases);
+    speak(data.reply);
+    turnCount++;
+    if (turnCount >= 2) document.getElementById('wrapup-btn').style.display = '';
+  } catch(e) {
+    typingEl.remove();
+    addSystemMessage('Error: ' + (e.message || 'Something went wrong. Please try again.'));
+    setMicState('idle');
+  }
+}
+
+async function sendText() {
+  const input = document.getElementById('text-input');
+  const text = input.value.trim();
+  if (!text || !sessionId || micState === 'processing') return;
+  input.value = '';
+  autoResize(input);
+  await handleTranscript(text);
+}
+
+function handleKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendText();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+// ─────────────────────────────────────────────
+// Render functions
+// ─────────────────────────────────────────────
+function removeWelcome() {
+  const w = document.getElementById('welcome-msg');
+  if (w) w.remove();
+}
+
+function addUserMessage(text) {
+  const thread = document.getElementById('thread');
+  const el = document.createElement('div');
+  el.className = 'msg user';
+  el.innerHTML = `
+    <div class="avatar">🙂</div>
+    <div class="bubble"><div class="reply-text">${escHtml(text)}</div></div>`;
+  thread.appendChild(el);
+  scrollThread();
+}
+
+function renderClaudeMessage(data, isOpener) {
+  const thread = document.getElementById('thread');
+  const el = document.createElement('div');
+  el.className = 'msg claude';
+
+  let inner = `<div class="reply-text">${escHtml(data.reply)}</div>`;
+  if (data.reply_transliteration) {
+    inner += `<div class="transliteration">${escHtml(data.reply_transliteration)}</div>`;
+  }
+
+  inner += `<div class="bubble-actions">
+    <button class="tts-btn" onclick="speak('${escAttr(data.reply)}')">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+      Play
+    </button>
+  </div>`;
+
+  el.innerHTML = `
+    <div class="avatar">🤖</div>
+    <div class="bubble">${inner}</div>`;
+  thread.appendChild(el);
+  scrollThread();
+}
+
+function addTypingIndicator() {
+  const thread = document.getElementById('thread');
+  const el = document.createElement('div');
+  el.className = 'msg claude';
+  el.id = 'typing-indicator';
+  el.innerHTML = `
+    <div class="avatar">🤖</div>
+    <div class="bubble">
+      <div class="typing-indicator">
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      </div>
+    </div>`;
+  thread.appendChild(el);
+  scrollThread();
+  return el;
+}
+
+function addSystemMessage(text) {
+  const thread = document.getElementById('thread');
+  const el = document.createElement('div');
+  el.style.cssText = 'text-align:center;font-size:12px;color:var(--danger);padding:8px;';
+  el.textContent = text;
+  thread.appendChild(el);
+  scrollThread();
+}
+
+function scrollThread() {
+  const thread = document.getElementById('thread');
+  thread.scrollTop = thread.scrollHeight;
+}
+
+// ─────────────────────────────────────────────
+// Feedback panel
+// ─────────────────────────────────────────────
+function toggleFeedback() {
+  feedbackOpen = !feedbackOpen;
+  document.getElementById('feedback-panel').classList.toggle('open', feedbackOpen);
+  document.getElementById('feedback-chevron').textContent = feedbackOpen ? '▼' : '▲';
+  if (feedbackOpen && lastFeedback) renderFeedback(lastFeedback, true);
+}
+
+function renderFeedback(data, force) {
+  lastFeedback = data;
+  document.getElementById('feedback-toggle').classList.add('has-feedback');
+
+  if (!feedbackOpen && !force) return;
+
+  const showConf = ['Advanced', 'Fluent'].includes(currentLevel);
+  const showFiller = ['Advanced', 'Fluent'].includes(currentLevel);
+
+  let html = '';
+
+  // Header with confidence
+  html += '<div class="feedback-header"><h3>Feedback</h3>';
+  if (showConf) {
+    const score = data.confidence_score;
+    let dotClass = score >= 7 ? 'high' : score <= 4 ? 'low' : '';
+    html += '<div class="confidence-bar"><span class="conf-label">Confidence</span>';
+    for (let i = 1; i <= 10; i++) {
+      html += `<div class="conf-dot ${i <= score ? 'filled ' + dotClass : ''}"></div>`;
+    }
+    html += `<span class="conf-label" style="margin-left:4px">${score}/10</span></div>`;
+  }
+  html += '</div>';
+
+  // Overall assessment
+  html += `<div class="overall-text">${escHtml(data.overall_assessment)}</div>`;
+
+  // Filler words
+  if (showFiller && data.filler_words && data.filler_words.length > 0) {
+    html += '<div class="filler-section"><h4>⚠ Filler words detected</h4><div class="filler-chips">';
+    for (const fw of data.filler_words) {
+      html += `<span class="filler-chip">"${escHtml(fw.word)}" <span class="count">×${fw.count}</span></span>`;
+    }
+    html += '</div>';
+    // Show suggestion for first filler word
+    if (data.filler_words[0].suggestion) {
+      html += `<p style="font-size:12px;color:var(--muted);margin-top:6px">${escHtml(data.filler_words[0].suggestion)}</p>`;
+    }
+    html += '</div>';
+  }
+
+  // Feedback items
+  if (data.feedback_items && data.feedback_items.length > 0) {
+    html += '<div class="feedback-grid">';
+    for (let i = 0; i < data.feedback_items.length; i++) {
+      const fi = data.feedback_items[i];
+      const tagClass = getTagClass(fi.category);
+      const hasDetails = fi.explanation || fi.original;
+      html += `<div class="feedback-item">
+        <div class="fi-header" onclick="toggleFI(${i})">
+          <span class="fi-tag ${tagClass}">${escHtml(fi.category)}</span>
+          <span class="fi-issue">${escHtml(fi.issue)}</span>
+          ${hasDetails ? `<span class="fi-chevron" id="fic-${i}">▼</span>` : ''}
+        </div>`;
+      if (hasDetails) {
+        html += `<div class="fi-details" id="fid-${i}"><div class="fi-details-inner">`;
+        if (fi.original && fi.correction) {
+          html += `<div class="fi-correction">
+            <span class="fi-original">${escHtml(fi.original)}</span>
+            <span class="fi-arrow">→</span>
+            <span class="fi-fixed">${escHtml(fi.correction)}</span>
+          </div>`;
+        }
+        if (fi.explanation) {
+          html += `<p style="margin-top:4px">${escHtml(fi.explanation)}</p>`;
+        }
+        html += '</div></div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  } else {
+    html += '<p style="font-size:13px;color:var(--muted);text-align:center;padding:8px 0">✓ No issues found this turn — great job!</p>';
+  }
+
+  document.getElementById('feedback-inner').innerHTML = html;
+}
+
+function toggleFI(index) {
+  const details = document.getElementById('fid-' + index);
+  const chevron = document.getElementById('fic-' + index);
+  if (!details) return;
+  const isOpen = details.classList.contains('open');
+  details.classList.toggle('open', !isOpen);
+  if (chevron) chevron.classList.toggle('open', !isOpen);
+}
+
+function getTagClass(category) {
+  const c = (category || '').toLowerCase();
+  if (c.includes('grammar'))    return 'tag-grammar';
+  if (c.includes('vocab'))      return 'tag-vocabulary';
+  if (c.includes('structure'))  return 'tag-structure';
+  if (c.includes('filler'))     return 'tag-filler';
+  if (c.includes('phrase') || c.includes('natural') || c.includes('idiom')) return 'tag-phrasing';
+  if (c.includes('confidence') || c.includes('register') || c.includes('hesit')) return 'tag-confidence';
+  if (c.includes('presence') || c.includes('persuasive') || c.includes('tic'))   return 'tag-presence';
+  return 'tag-default';
+}
+
+// ─────────────────────────────────────────────
+// Suggested phrases
+// ─────────────────────────────────────────────
+function renderPhrases(phrases) {
+  const bar = document.getElementById('phrases-bar');
+  if (!phrases || !phrases.length) {
+    bar.classList.remove('visible');
+    return;
+  }
+  bar.innerHTML = '<span class="phrases-label">Try saying:</span>';
+  for (const p of phrases) {
+    const btn = document.createElement('button');
+    btn.className = 'phrase-chip';
+    btn.textContent = p;
+    btn.onclick = () => {
+      document.getElementById('text-input').value = p;
+      autoResize(document.getElementById('text-input'));
+      document.getElementById('text-input').focus();
+    };
+    bar.appendChild(btn);
+  }
+  bar.classList.add('visible');
+}
+
+// ─────────────────────────────────────────────
+// TTS
+// ─────────────────────────────────────────────
+function toggleVoice() {
+  voiceEnabled = !voiceEnabled;
+  const btn = document.getElementById('voice-toggle');
+  btn.textContent = voiceEnabled ? '🔊 Voice' : '🔇 Silent';
+  btn.style.color = voiceEnabled ? 'var(--text)' : 'var(--muted)';
+  if (!voiceEnabled && synth) synth.cancel();
+}
+
+function speak(text) {
+  if (!voiceEnabled || !synth || !text) {
+    setMicState('idle');
+    return;
+  }
+  synth.cancel();
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = currentLangCode;
+
+  // Try to find a native voice
+  const langPrefix = currentLangCode.split('-')[0];
+  const native = voices.find(v =>
+    v.lang.startsWith(langPrefix) && !v.name.toLowerCase().includes('google')
+  ) || voices.find(v => v.lang.startsWith(langPrefix));
+  if (native) utt.voice = native;
+
+  // Adjust rate by level
+  const rates = { Beginner: 0.8, Intermediate: 0.9, Advanced: 1.0, Fluent: 1.05 };
+  utt.rate = rates[currentLevel] || 1.0;
+
+  setMicState('speaking');
+  utt.onend = () => setMicState('idle');
+  utt.onerror = () => setMicState('idle');
+  synth.speak(utt);
+}
+
+// ─────────────────────────────────────────────
+// Utilities
+// ─────────────────────────────────────────────
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/\n/g, '<br>');
+}
+
+function escAttr(str) {
+  if (!str) return '';
+  return String(str).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+</script>
+</body>
+</html>
